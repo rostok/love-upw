@@ -1,0 +1,356 @@
+diff --git a/extra/cmake/LuaJITUWP.cmake b/extra/cmake/LuaJITUWP.cmake
+index eb89eacc..073089b5 100644
+--- a/extra/cmake/LuaJITUWP.cmake
++++ b/extra/cmake/LuaJITUWP.cmake
+@@ -4,8 +4,12 @@ function(love_add_luajit_uwp target)
+ 	if(NOT MSVC OR NOT CMAKE_SYSTEM_NAME STREQUAL "WindowsStore")
+ 		message(FATAL_ERROR "The bundled LuaJIT target is only for MSVC WindowsStore builds.")
+ 	endif()
+-	if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
+-		message(FATAL_ERROR "The bundled LuaJIT target currently supports x64 only.")
++	if(CMAKE_VS_PLATFORM_NAME STREQUAL "ARM64")
++		message(FATAL_ERROR "The bundled LuaJIT target does not support ARM64 yet.")
++	elseif(CMAKE_SIZEOF_VOID_P EQUAL 8)
++		set(lj_arch x64)
++	else()
++		set(lj_arch x86)
+ 	endif()
+ 
+ 	FetchContent_Declare(love_luajit_source
+@@ -35,7 +39,7 @@ function(love_add_luajit_uwp target)
+ 		"${lj_src}/lib_*.c"
+ 		"${lj_src}/lj_*.c"
+ 		"${lj_src}/lj_*.h"
+-		"${lj_src}/vm_x64.dasc"
++		"${lj_src}/vm_${lj_arch}.dasc"
+ 	)
+ 	add_custom_command(
+ 		OUTPUT ${lj_generated}
+@@ -43,10 +47,11 @@ function(love_add_luajit_uwp target)
+ 			"${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../uwp/generate-luajit.ps1"
+ 			-SourceRoot "${love_luajit_source_SOURCE_DIR}"
+ 			-OutputRoot "${lj_gen}"
++			-Arch ${lj_arch}
+ 		DEPENDS
+ 			"${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../uwp/generate-luajit.ps1"
+ 			${lj_generator_inputs}
+-		COMMENT "Generating LuaJIT x64 VM and library definitions"
++		COMMENT "Generating LuaJIT ${lj_arch} VM and library definitions"
+ 		VERBATIM
+ 	)
+ 
+diff --git a/extra/uwp/generate-luajit.ps1 b/extra/uwp/generate-luajit.ps1
+index 6ea1e59a..bf100537 100644
+--- a/extra/uwp/generate-luajit.ps1
++++ b/extra/uwp/generate-luajit.ps1
+@@ -3,7 +3,12 @@ param(
+     [string]$SourceRoot,
+ 
+     [Parameter(Mandatory = $true)]
+-    [string]$OutputRoot
++    [string]$OutputRoot,
++
++    # The host tools must have the target's pointer size, so x86 builds them
++    # with the x86 desktop compiler and libraries.
++    [ValidateSet('x64', 'x86')]
++    [string]$Arch = 'x64'
+ )
+ 
+ $ErrorActionPreference = 'Stop'
+@@ -15,16 +20,20 @@ $hostOutput = Join-Path $output 'host'
+ $jitOutput = Join-Path $output 'jit'
+ New-Item -ItemType Directory -Force -Path $output, $hostOutput, $jitOutput | Out-Null
+ 
+-$compiler = (Get-Command cl.exe -ErrorAction Stop).Source
+-$linker = (Get-Command link.exe -ErrorAction Stop).Source
+-$compilerBin = Split-Path -Parent $compiler
+-$msvcRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $compilerBin))
+-$desktopVcLib = Join-Path $msvcRoot 'lib\x64'
++$targetCompiler = (Get-Command cl.exe -ErrorAction Stop).Source
++$msvcRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $targetCompiler)))
++$compilerBin = Join-Path $msvcRoot "bin\Hostx64\$Arch"
++$compiler = Join-Path $compilerBin 'cl.exe'
++$linker = Join-Path $compilerBin 'link.exe'
++if (-not (Test-Path -LiteralPath $compiler) -or -not (Test-Path -LiteralPath $linker)) {
++    throw "Could not locate the $Arch MSVC host tools under $compilerBin."
++}
++$desktopVcLib = Join-Path $msvcRoot "lib\$Arch"
+ $kitsRoot = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\Lib'
+ $sdkVersion = Get-ChildItem -LiteralPath $kitsRoot -Directory |
+     Where-Object {
+-        (Test-Path -LiteralPath (Join-Path $_.FullName 'ucrt\x64\ucrt.lib')) -and
+-        (Test-Path -LiteralPath (Join-Path $_.FullName 'um\x64\kernel32.lib'))
++        (Test-Path -LiteralPath (Join-Path $_.FullName "ucrt\$Arch\ucrt.lib")) -and
++        (Test-Path -LiteralPath (Join-Path $_.FullName "um\$Arch\kernel32.lib"))
+     } |
+     Sort-Object { [version]$_.Name } -Descending |
+     Select-Object -First 1
+@@ -33,8 +42,8 @@ if (-not (Test-Path -LiteralPath (Join-Path $desktopVcLib 'libcmt.lib')) -or -no
+ }
+ $hostLinkPaths = @(
+     "/libpath:$desktopVcLib",
+-    "/libpath:$(Join-Path $sdkVersion.FullName 'ucrt\x64')",
+-    "/libpath:$(Join-Path $sdkVersion.FullName 'um\x64')"
++    "/libpath:$(Join-Path $sdkVersion.FullName "ucrt\$Arch")",
++    "/libpath:$(Join-Path $sdkVersion.FullName "um\$Arch")"
+ )
+ 
+ function Invoke-Native {
+@@ -85,12 +94,13 @@ Invoke-Native $miniExe @(
+ $buildvmArch = Join-Path $hostOutput 'buildvm_arch.h'
+ Push-Location $src
+ try {
+-    Invoke-Native $miniExe @(
+-        (Join-Path $dynasm 'dynasm.lua'), '-LN',
+-        '-D', 'WIN', '-D', 'JIT', '-D', 'FFI', '-D', 'ENDIAN_LE',
+-        '-D', 'FPU', '-D', 'P64',
+-        '-o', $buildvmArch, 'vm_x64.dasc'
+-    )
++    $dynasmFlags = @('-D', 'WIN', '-D', 'JIT', '-D', 'FFI', '-D', 'ENDIAN_LE', '-D', 'FPU')
++    if ($Arch -eq 'x64') {
++        $dynasmFlags += @('-D', 'P64')
++    }
++    Invoke-Native $miniExe (@((Join-Path $dynasm 'dynasm.lua'), '-LN') + $dynasmFlags + @(
++        '-o', $buildvmArch, "vm_$Arch.dasc"
++    ))
+ 
+     $buildvmSources = Get-ChildItem -LiteralPath (Join-Path $src 'host') -File -Filter 'buildvm*.c' |
+         ForEach-Object FullName
+diff --git a/src/libraries/enet/libenet/win32.c b/src/libraries/enet/libenet/win32.c
+index 5cc16799..a5421408 100644
+--- a/src/libraries/enet/libenet/win32.c
++++ b/src/libraries/enet/libenet/win32.c
+@@ -9,6 +9,13 @@
+ #include <windows.h>
+ #include <mmsystem.h>
+ 
++#if defined(WINAPI_FAMILY) && !WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
++/* UWP has no winmm timer API. GetTickCount64 counts milliseconds too. */
++#define timeBeginPeriod(period) ((void) 0)
++#define timeEndPeriod(period) ((void) 0)
++#define timeGetTime() ((DWORD) GetTickCount64 ())
++#endif
++
+ static enet_uint32 timeBase = 0;
+ 
+ int
+diff --git a/src/modules/love/love.cpp b/src/modules/love/love.cpp
+index 0202a852..6a5f551b 100644
+--- a/src/modules/love/love.cpp
++++ b/src/modules/love/love.cpp
+@@ -554,6 +554,65 @@ int luaopen_love(lua_State *L)
+ 	});
+ #endif
+ 
++#ifdef LOVE_WINDOWS_UWP
++	// love.progress(text, value) for love-uwp: a game calls it while it loads
++	// for a long time on the main thread. It draws the text and a bar (value
++	// 0..1) or a step number (value > 1), presents the frame and pumps window
++	// events so Windows does not consider the app hung. Desktop LÖVE has no
++	// such function, so games call it as `(love.progress or function() end)`.
++	static const char progress_lua[] = R"lua(
++local love = ...
++local lastDraw = -1
++local function draw(text, value)
++	local g, timer = love.graphics, love.timer
++	if not (g and timer and g.isActive and g.isActive()) then return end
++	local now = timer.getTime()
++	if now - lastDraw < 1 / 30 then return end
++	lastDraw = now
++	local style = love.progressStyle or {}
++	-- reset() also unbinds the game's Canvas, which love.event.pump requires;
++	-- pop() puts the game's graphics state back afterwards.
++	g.push("all")
++	g.reset()
++	if love.event then love.event.pump() end
++	g.clear(style.background or { 0.06, 0.07, 0.09, 1 })
++	local font = style.font or g.getFont()
++	g.setFont(font)
++	g.setColor(style.color or { 1, 1, 1, 1 })
++	local w, h = g.getDimensions()
++	local y = math.floor(h * 0.55)
++	if text ~= nil then
++		g.printf(tostring(text), 0, y - font:getHeight() * 2, w, "center")
++	end
++	if type(value) == "number" then
++		if value <= 1 then
++			local bw, bh = math.floor(w * 0.5), math.max(4, math.floor(h * 0.012))
++			local bx = math.floor((w - bw) / 2)
++			g.setLineWidth(1)
++			g.rectangle("line", bx - 3, y - 3, bw + 6, bh + 6)
++			g.rectangle("fill", bx, y, bw * math.min(1, math.max(0, value)), bh)
++		else
++			g.printf(string.format("%d", value), 0, y, w, "center")
++		end
++	end
++	g.present()
++	g.pop()
++end
++function love.progress(text, value)
++	-- Never let a progress display break the game's loading.
++	local ok, err = pcall(draw, text, value)
++	if not ok then print("love.progress: " .. tostring(err)) end
++end
++)lua";
++	if (luaL_loadbuffer(L, progress_lua, sizeof(progress_lua) - 1, "=[love-uwp \"progress.lua\"]") == 0)
++	{
++		lua_pushvalue(L, -2);
++		lua_call(L, 1, 0);
++	}
++	else
++		lua_pop(L, 1);
++#endif
++
+ 	return 1;
+ }
+ 
+diff --git a/src/modules/window/sdl/UWPEGL.cpp b/src/modules/window/sdl/UWPEGL.cpp
+index e78d3298..75d21421 100644
+--- a/src/modules/window/sdl/UWPEGL.cpp
++++ b/src/modules/window/sdl/UWPEGL.cpp
+@@ -20,9 +20,11 @@ std::optional<EGLSurfaceSize> getEGLSurfaceSize()
+ 	constexpr EGLint EGL_HEIGHT = 0x3056;
+ 	constexpr EGLint EGL_DRAW = 0x3059;
+ 
+-	using GetCurrentDisplay = EGLDisplay (*)();
+-	using GetCurrentSurface = EGLSurface (*)(EGLint);
+-	using QuerySurface = EGLBoolean (*)(EGLDisplay, EGLSurface, EGLint, EGLint *);
++	// EGL entry points are __stdcall (EGLAPIENTRY) on Windows; on x86 a
++	// default (cdecl) pointer type corrupts the stack.
++	using GetCurrentDisplay = EGLDisplay (__stdcall *)();
++	using GetCurrentSurface = EGLSurface (__stdcall *)(EGLint);
++	using QuerySurface = EGLBoolean (__stdcall *)(EGLDisplay, EGLSurface, EGLint, EGLint *);
+ 
+ 	static void *library = SDL_LoadObject("libEGL.dll");
+ 	if (!library)
+@@ -49,6 +51,47 @@ std::optional<EGLSurfaceSize> getEGLSurfaceSize()
+ 	return EGLSurfaceSize{width, height};
+ }
+ 
++namespace
++{
++
++// The surface size shouldReannounceSurfaceSize last reported as differing
++// from the prediction. From then on that size is trusted over the prediction,
++// so a wrong prediction causes one extra resize, not one every frame.
++EGLSurfaceSize reannouncedSize = {0, 0};
++
++} // anonymous namespace
++
++void getSurfacePixelSize(int windowWidth, int windowHeight, int &pixelWidth, int &pixelHeight)
++{
++	// SDL's WinRT backend reports the window size in physical pixels, rounded
++	// the same way ANGLE sizes its CoreWindow swap chain, so the window size
++	// is the size the surface will have after the next present.
++	auto actual = getEGLSurfaceSize();
++	bool trustActual = actual && actual->width == reannouncedSize.width
++		&& actual->height == reannouncedSize.height;
++
++	if (!trustActual && windowWidth > 0 && windowHeight > 0)
++		actual = EGLSurfaceSize{windowWidth, windowHeight};
++
++	if (actual)
++	{
++		pixelWidth = actual->width;
++		pixelHeight = actual->height;
++	}
++}
++
++bool shouldReannounceSurfaceSize(int pixelWidth, int pixelHeight)
++{
++	auto actual = getEGLSurfaceSize();
++	if (!actual || (actual->width == pixelWidth && actual->height == pixelHeight))
++		return false;
++	if (actual->width == reannouncedSize.width && actual->height == reannouncedSize.height)
++		return false;
++
++	reannouncedSize = *actual;
++	return true;
++}
++
+ } // sdl
+ } // window
+ } // love
+diff --git a/src/modules/window/sdl/UWPEGL.h b/src/modules/window/sdl/UWPEGL.h
+index b2d28941..c99d3081 100644
+--- a/src/modules/window/sdl/UWPEGL.h
++++ b/src/modules/window/sdl/UWPEGL.h
+@@ -17,6 +17,16 @@ struct EGLSurfaceSize
+ 
+ std::optional<EGLSurfaceSize> getEGLSurfaceSize();
+ 
++// Sets the drawable size for a window size (physical pixels, as SDL's WinRT
++// backend reports it). ANGLE only resizes its CoreWindow swap chain on the
++// next present, so right after a resize the EGL surface is stale; this
++// predicts the size ANGLE will use instead.
++void getSurfacePixelSize(int windowWidth, int windowHeight, int &pixelWidth, int &pixelHeight);
++
++// True, once per surface size, when the EGL surface differs from the drawable
++// size last set by getSurfacePixelSize, i.e. the prediction was wrong.
++bool shouldReannounceSurfaceSize(int pixelWidth, int pixelHeight);
++
+ } // sdl
+ } // window
+ } // love
+diff --git a/src/modules/window/sdl/Window.cpp b/src/modules/window/sdl/Window.cpp
+index 59e3357a..890818f3 100644
+--- a/src/modules/window/sdl/Window.cpp
++++ b/src/modules/window/sdl/Window.cpp
+@@ -582,11 +582,7 @@ bool Window::onSizeChanged(int width, int height)
+ 	SDL_GL_GetDrawableSize(window, &pixelWidth, &pixelHeight);
+ 
+ #ifdef LOVE_UWP_ANGLE
+-	if (auto size = getEGLSurfaceSize())
+-	{
+-		pixelWidth = size->width;
+-		pixelHeight = size->height;
+-	}
++	getSurfacePixelSize(windowWidth, windowHeight, pixelWidth, pixelHeight);
+ #endif
+ 
+ 	if (graphics.get())
+@@ -608,11 +604,7 @@ void Window::updateSettings(const WindowSettings &newsettings, bool updateGraphi
+ 	SDL_GL_GetDrawableSize(window, &pixelWidth, &pixelHeight);
+ 
+ #ifdef LOVE_UWP_ANGLE
+-	if (auto size = getEGLSurfaceSize())
+-	{
+-		pixelWidth = size->width;
+-		pixelHeight = size->height;
+-	}
++	getSurfacePixelSize(windowWidth, windowHeight, pixelWidth, pixelHeight);
+ #endif
+ 
+ 	if ((wflags & SDL_WINDOW_FULLSCREEN_DESKTOP) == SDL_WINDOW_FULLSCREEN_DESKTOP)
+@@ -1101,6 +1093,31 @@ void Window::swapBuffers()
+ 
+ 	SDL_GL_SwapWindow(window);
+ 
++#ifdef LOVE_UWP_ANGLE
++	// onSizeChanged predicts the swap chain size. If ANGLE's surface ended up
++	// different, re-announce the current size so the viewport follows it.
++	// Skip this while SDL has a size change of its own queued (the window
++	// size it reports already differs from the one we last handled).
++	{
++		int width = 0;
++		int height = 0;
++		SDL_GetWindowSize(window, &width, &height);
++		bool pending = width != windowWidth || height != windowHeight;
++		if (!pending && shouldReannounceSurfaceSize(pixelWidth, pixelHeight))
++		{
++			SDL_Event event = {};
++			event.type = SDL_WINDOWEVENT;
++			event.window.windowID = SDL_GetWindowID(window);
++			event.window.data1 = width;
++			event.window.data2 = height;
++			event.window.event = SDL_WINDOWEVENT_SIZE_CHANGED;
++			SDL_PushEvent(&event);
++			event.window.event = SDL_WINDOWEVENT_RESIZED;
++			SDL_PushEvent(&event);
++		}
++	}
++#endif
++
+ #if defined(LOVE_WINDOWS) && !defined(LOVE_WINDOWS_UWP)
+ 	if (useDwmFlush)
+ 	{

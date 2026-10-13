@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Filled in by CMake (cmake/PlayerConfig.cmake) from games/<game>/player.json. -->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
+  IgnorableNamespaces="uap mp">
+
+  <Identity
+    Name="@APPX_NAME@"
+    Publisher="@APPX_PUBLISHER@"
+    Version="@APPX_VERSION@" />
+
+  <!-- Required by the Visual Studio packaging targets; unused on desktop/Xbox. -->
+  <mp:PhoneIdentity PhoneProductId="@APPX_PHONE_ID@" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
+
+  <Properties>
+    <DisplayName>@APPX_DISPLAY_NAME@</DisplayName>
+    <PublisherDisplayName>@APPX_PUBLISHER_DISPLAY_NAME@</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily
+      Name="Windows.Universal"
+      MinVersion="@APPX_MIN_VERSION@"
+      MaxVersionTested="@APPX_MAX_VERSION_TESTED@" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="x-generate" />
+  </Resources>
+
+  <Applications>
+    <Application Id="Game" Executable="$targetnametoken$.exe" EntryPoint="LovePlayer.Game">
+      <uap:VisualElements
+        DisplayName="@APPX_DISPLAY_NAME@"
+        Description="@APPX_DESCRIPTION@"
+        BackgroundColor="@APPX_BACKGROUND@"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile
+          Square71x71Logo="Assets\SmallTile.png"
+          Wide310x150Logo="Assets\WideTile.png"
+          Square310x310Logo="Assets\LargeTile.png" />
+        <uap:SplashScreen Image="Assets\SplashScreen.png" BackgroundColor="@APPX_BACKGROUND@" />
+      </uap:VisualElements>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+@APPX_CAPABILITIES@
+  </Capabilities>
+</Package>

@@ -1,0 +1,23 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "store",
+      "hidden": true,
+      "generator": "Visual Studio 17 2022",
+      "binaryDir": "${sourceDir}/build/preset-${presetName}",
+      "cacheVariables": {
+        "CMAKE_SYSTEM_NAME": "WindowsStore",
+        "CMAKE_SYSTEM_VERSION": "10.0"
+      }
+    },
+    { "name": "x64", "inherits": "store", "architecture": "x64" },
+    { "name": "x86", "inherits": "store", "architecture": "Win32" },
+    { "name": "arm64", "inherits": "store", "architecture": "ARM64", "displayName": "ARM64 (needs third_party/arm64, not built yet)" }
+  ],
+  "buildPresets": [
+    { "name": "x64", "configurePreset": "x64", "configuration": "Release" },
+    { "name": "x86", "configurePreset": "x86", "configuration": "Release" },
+    { "name": "arm64", "configurePreset": "arm64", "configuration": "Release" }
+  ]
+}

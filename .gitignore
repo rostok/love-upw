@@ -1,0 +1,14 @@
+/build/
+/dist/
+/.certs/
+*.pfx
+
+# Game archives are large and usually symlinked from the game's own repo.
+/games/*/*.love
+
+# Dependency sources and build trees created by scripts/build-deps.ps1.
+/deps/
+*.log
+
+# Local notes for AI assistants (not part of the project)
+CLAUDE.md

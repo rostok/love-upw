@@ -1,0 +1,22 @@
+diff --git a/alc/backends/wasapi.cpp b/alc/backends/wasapi.cpp
+index 25a2437..03e6b2e 100644
+--- a/alc/backends/wasapi.cpp
++++ b/alc/backends/wasapi.cpp
+@@ -511,7 +511,7 @@ struct DeviceEnumHelper final : private IMMNotificationClient {
+ 
+ #if ALSOFT_UWP
+     /** ----------------------- IActivateAudioInterfaceCompletionHandler ------------ */
+-    HRESULT ActivateCompleted(IActivateAudioInterfaceAsyncOperation*) override
++    STDMETHODIMP ActivateCompleted(IActivateAudioInterfaceAsyncOperation*) override
+     {
+         SetEvent(mActiveClientEvent);
+ 
+@@ -892,7 +892,7 @@ struct DeviceHelper final : public IActivateAudioInterfaceCompletionHandler {
+     }
+ 
+     /** ----------------------- IActivateAudioInterfaceCompletionHandler ------------ */
+-    HRESULT ActivateCompleted(IActivateAudioInterfaceAsyncOperation*) override
++    STDMETHODIMP ActivateCompleted(IActivateAudioInterfaceAsyncOperation*) override
+     {
+         SetEvent(mActiveClientEvent);
+ 

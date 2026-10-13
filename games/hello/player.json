@@ -1,0 +1,14 @@
+{
+  "displayName": "Hello LÖVE UWP",
+  "description": "Smoke test for the LÖVE UWP player",
+  "identityName": "LoveUwp.Hello",
+  "publisher": "CN=LoveUwpDev",
+  "publisherDisplayName": "love-uwp",
+  "version": "1.0.0",
+  "backgroundColor": "#101820",
+  "capabilities": [
+    "internetClient",
+    "codeGeneration"
+  ],
+  "source": "src"
+}

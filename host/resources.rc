@@ -1,0 +1,8 @@
+// Win32 resources linked into the host executable.
+//
+// SDL hides the mouse cursor on UWP by switching to the custom cursor with
+// resource id 5000. Without it SDL falls back to removing the cursor
+// altogether, which hides it too eagerly and stops mouse-move events.
+#include <winres.h>
+
+5000 CURSOR "blank.cur"
