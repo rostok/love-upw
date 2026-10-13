@@ -72,6 +72,20 @@ function Find-SdkTool([string]$Name) {
     $found
 }
 
+function Find-Curl {
+    <# Git for Windows' curl.exe: it gets through firewalls that block vcpkg.exe,
+       python and the system curl, and falls back from broken IPv6. #>
+    $gitExe = (Get-Command git -ErrorAction SilentlyContinue).Source
+    if ($gitExe) {
+        $gitRoot = Split-Path -Parent (Split-Path -Parent $gitExe)
+        foreach ($rel in 'mingw64\bin\curl.exe', '..\mingw64\bin\curl.exe') {
+            $candidate = Join-Path $gitRoot $rel
+            if (Test-Path -LiteralPath $candidate) { return (Resolve-Path -LiteralPath $candidate).Path }
+        }
+    }
+    (Get-Command curl.exe -ErrorAction Stop).Source
+}
+
 function Resolve-GameDir([string]$Game) {
     foreach ($dir in @($Game, (Join-Path $RepoRoot "games\$Game"))) {
         if ($dir -and (Test-Path -LiteralPath (Join-Path $dir 'player.json'))) {

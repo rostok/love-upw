@@ -51,3 +51,5 @@ Finished work, grouped by topic (state as of 2026-10-13).
 
 - On-screen keyboard: host sets SDL_HINT_ENABLE_SCREEN_KEYBOARD=0 unless player.json has "screenKeyboard": true (games calling love.keyboard.setTextInput(true), e.g. PICO-8 poke(0x5f2d,1), popped up the Xbox keyboard).
 - games/hello shows a JIT measurement (trace compiled, compiled vs interpreted loop time) and gamepad state.
+- scripts\xbox.ps1: Xbox Device Portal client (info, apps, install, uninstall, launch, stop, ps, perf, screenshot, files, pull); verified on Xbox One S.
+- build.ps1 -Revision auto (dev build counter, in-place updates) and -ExtraCapabilities (e.g. privateNetworkClientServer); debug server reachable on the Xbox (port 5555); on-screen keyboard fix verified on the console.

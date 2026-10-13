@@ -25,8 +25,12 @@
 8. Xbox Dev Mode (Xbox One S): Schifahren działa, ale bardzo wolno (1080p kilka fps, 2160p crash).
    Log z konsoli vs PC: dźwięki 20,1 s vs 3,1 s (kod C, 6,5x), mapa 36,9 s vs 4,5 s, pathfinder (FFI) 1,38 s vs 0,21 s,
    INIT 45 s vs 5,3 s — wszystko ~6,5–8,5x, czyli JIT działa, ogranicza CPU One S (Jaguar 1,75 GHz).
-   Do sprawdzenia: typ aplikacji w Dev Home = Game (App ma ~1 GB RAM i ograniczone CPU/GPU); test games\hello
+   Przez API (scripts\xbox.ps1): proces gry zatrzymuje się na ~1 GB (limit typu App), partycja aplikacji ~2,3 GB;
+   FPS: 17 w grze, 9 w menu startowym (1080p).
+   Do sprawdzenia: typ aplikacji w Dev Home = Game i ponowny pomiar (xbox.ps1 ps/perf/screenshot); test games\hello
    na konsoli (JIT 'trace compiled', pad); porównanie na Xbox Series S/X.
+8b. Xbox: na zrzucie ekranu widać kursor myszy na środku — sprawdzić, czy to tryb myszy Xboksa (pad steruje kursorem
+   zamiast trafiać do gry); jeśli tak, wyłączyć go w hoście (non-XAML: PointerMode / RequiresPointer).
 8a. Limit rozdzielczości rysowania (dla Xboksa w 2160p i słabego GPU):
    - własna łatka SDL (SDL_winrtvideo.cpp, tworzenie powierzchni EGL ~l.668): zamiast gołego CoreWindow przekazać
      do eglCreateWindowSurface PropertySet z EGLNativeWindowTypeProperty + EGLRenderResolutionScaleProperty

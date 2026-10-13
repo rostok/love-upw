@@ -12,6 +12,15 @@ and take the .msix that the Visual Studio packaging step produces. Then:
   <out>\Dependencies\<arch>\               VCLibs framework packages
   -Store  <out>\<identity>_<version>.msixupload  (unsigned, for Partner Center)
   -Sign   signs the .msix/.msixbundle and adds the public .cer
+  -Revision  fourth version number (default 0; "auto" = next number from
+          <game folder>\.dev-revision, for development builds)
+  -ExtraCapabilities  adds capabilities for this build only, e.g.
+          privateNetworkClientServer for a development build whose debug
+          server must accept LAN connections
+
+Development builds use -Revision auto so that each new build installs as an
+update (keeps saves and, on Xbox, the app type); the Store reserves the fourth
+number and needs 0.
 
 <out> is -OutDir (default: dist\<identity> in this repository). Earlier
 packages of the same game in <out> are replaced; other files there stay.
@@ -33,7 +42,9 @@ param(
     [string]$Pfx,
     [string]$PfxPassword = 'love-uwp-dev',
     [switch]$Store,
-    [string]$OutDir
+    [string]$OutDir,
+    [string[]]$ExtraCapabilities = @(),
+    [string]$Revision = '0'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -43,7 +54,18 @@ $gameDir = Resolve-GameDir $Game
 $player = Read-PlayerJson $gameDir
 $gameName = $player.identityName
 if (-not $Version) { $Version = if ($player.PSObject.Properties['version']) { $player.version } else { '1.0.0' } }
-$fullVersion = "$Version.0"
+# Fourth version number: 0 for the Store; "auto" counts development builds in
+# <game folder>\.dev-revision, so each sideloaded build installs as an update.
+if ($Revision -eq 'auto') {
+    $counterFile = Join-Path $gameDir '.dev-revision'
+    $last = 0
+    if (Test-Path -LiteralPath $counterFile) { $last = [int](Get-Content -Raw -LiteralPath $counterFile).Trim() }
+    $Revision = [string]($last + 1)
+    Set-Content -LiteralPath $counterFile -Value $Revision
+}
+if ($Revision -notmatch '^\d+$' -or [int]$Revision -gt 65535) { throw "Revision must be 0..65535 or auto" }
+if ($Store -and $Revision -ne '0') { throw 'Store packages need revision 0' }
+$fullVersion = "$Version.$Revision"
 if (-not $Arch) { $Arch = @((Read-DepsConfig).binaries.PSObject.Properties.Name) }
 if (-not $Arch) { throw 'No architectures in third_party\deps.json; run scripts\build-deps.ps1 first.' }
 
@@ -87,7 +109,8 @@ foreach ($a in $Arch) {
     Write-Host "`n### $gameName $Version ($a)" -ForegroundColor Cyan
     Invoke-Exe cmake --fresh -S $RepoRoot -B $buildDir -G 'Visual Studio 17 2022' -A $Platforms[$a] `
         '-DCMAKE_SYSTEM_NAME=WindowsStore' '-DCMAKE_SYSTEM_VERSION=10.0' `
-        "-DGAME_DIR=$gameDir" "-DGAME_VERSION=$Version" "-DGAME_LOVE_OVERRIDE=$loveOverride"
+        "-DGAME_DIR=$gameDir" "-DGAME_VERSION=$Version" "-DGAME_LOVE_OVERRIDE=$loveOverride" `
+        "-DGAME_EXTRA_CAPABILITIES=$($ExtraCapabilities -join ';')" "-DGAME_REVISION=$Revision"
     Invoke-Exe cmake --build $buildDir --config Release --parallel
 
     # Visual Studio names the folder and file after its platform (Win32 for x86).

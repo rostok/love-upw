@@ -43,6 +43,7 @@ LovePlayer.exe (host/main.cpp)
 | `scripts/build-deps.ps1` | rebuilds `third_party/<arch>` from the pins in `third_party/deps.json` |
 | `scripts/check-deps.ps1` | verifies `third_party/<arch>` against the hashes (run before every package build) |
 | `scripts/LoveUwp.psm1` | shared helpers |
+| `scripts/xbox.ps1` | Xbox Device Portal REST client (install, launch, stop, screenshot, processes, files) |
 
 Points that matter:
 
@@ -160,6 +161,24 @@ chromium.googlesource.com fail now and then; `--jobs 4` and re-running resume.
   close it as hung (event 1002 "stopped interacting with Windows"). Use
   `love.progress`.
 
+## 4a. Xbox Device Portal API (used by `scripts/xbox.ps1`)
+
+- Base URL `https://<console>:11443`, self-signed certificate; without a portal
+  password no authentication is needed.
+- Every POST/DELETE needs the `X-CSRF-Token` header with the value of the
+  `CSRF-Token` cookie returned by any GET, and a `Content-Length` (send
+  `Content-Length: 0` for empty bodies, otherwise HTTP 411).
+- Install: `POST /api/app/packagemanager/package?package=<file>` with a
+  multipart body (package + dependency `.appx` files), then poll
+  `GET /api/app/packagemanager/state` (204 = running, 200 = done).
+- Launch/stop: `POST|DELETE /api/taskmanager/app?appid=<base64 PRAID>&package=<base64 full name>`.
+- Files: `/api/filesystem/apps/files|file?knownfolderid=LocalAppData&packagefullname=...&path=\LocalState\...`.
+- `/api/resourcemanager/processes` and `systemperf` show the shared (App)
+  partition: about 2.3 GB on an Xbox One S; an *App* process stops near 1 GB.
+- The app type (App/Game) is not exposed by the API (`/ext/app/deployinfo`
+  only says `DeployType: UWP`); set it in Dev Home.
+- Git for Windows' curl is used because Windows PowerShell 5.1 cannot skip
+  certificate checks and the build PC's firewall blocks other HTTP clients.
 ## 5. Debugging crashes
 
 - Event Viewer → Application: event 1000 (crash, faulting module + offset),

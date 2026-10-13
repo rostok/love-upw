@@ -47,13 +47,8 @@ $dirs = @{
 }
 $target = Join-Path $ThirdParty $Arch
 
-# Git for Windows' curl: it gets through firewalls that block vcpkg.exe,
-# python and the system curl (and handles broken IPv6).
 $gitExe = (Get-Command git).Source
-$curl = @('mingw64\bin\curl.exe', '..\mingw64\bin\curl.exe') |
-    ForEach-Object { Join-Path (Split-Path (Split-Path $gitExe)) $_ } |
-    Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-if (-not $curl) { $curl = (Get-Command curl.exe).Source }
+$curl = Find-Curl
 
 function Step([string]$Text) { Write-Host "`n### $Text" -ForegroundColor Cyan }
 

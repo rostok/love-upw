@@ -214,15 +214,44 @@ the Windows SDK.
 
 ## Xbox (Dev Mode)
 
-1. Switch the console to Developer Mode and open **Xbox Device Portal** in a
-   browser.
-2. Under **Add**, upload `dist\mygame\MyCompany.MyGame_1.0.0.0_x64.msix` (or
-   the bundle). Add `Dependencies\x64\Microsoft.VCLibs.x64.14.00.appx` as a
-   dependency.
-3. In Dev Home, set the app type to **Game** so it gets full GPU resources.
+1. Switch the console to Developer Mode. In Dev Home enable remote access to
+   **Xbox Device Portal** (`https://<console ip>:11443`).
+2. Install with `scripts\xbox.ps1` (uses the Device Portal REST API) or by
+   hand in Device Portal (**Add**, the `_x64.msix` plus
+   `Dependencies\x64\Microsoft.VCLibs.x64.14.00.appx`).
+3. In Dev Home select the game, press the View or Menu button, **View
+   details**, and set **App type: Game**. The default type *App* is limited
+   to about 1 GB of memory and a share of the CPU and GPU. The setting is kept
+   when the package is updated, not when it is uninstalled.
+
+`scripts\xbox.ps1` (console address in `-Device` or `LOVE_UWP_XBOX`):
+
+```powershell
+$env:LOVE_UWP_XBOX = '192.168.0.229'
+scripts\xbox.ps1 info                                   # console model and OS
+scripts\xbox.ps1 install <out>\MyCompany.MyGame_1.0.0.3_x64.msix
+scripts\xbox.ps1 launch MyCompany.MyGame               # stop / uninstall likewise
+scripts\xbox.ps1 ps Love                               # CPU and memory of the game process
+scripts\xbox.ps1 perf                                  # console CPU / memory / GPU
+scripts\xbox.ps1 screenshot shot.png
+scripts\xbox.ps1 files MyCompany.MyGame \LocalState    # list save files
+scripts\xbox.ps1 pull MyCompany.MyGame \LocalState\mygame\log.txt .
+```
+
+Development builds for the console:
+
+```powershell
+scripts\build.ps1 -Game <game folder> -Arch x64 -Sign -Revision auto -ExtraCapabilities privateNetworkClientServer
+```
+
+- `-Revision auto` raises the fourth version number on every build (counter
+  in `<game folder>\.dev-revision`), so each build installs as an update and
+  keeps saves and the app type. Store builds keep revision 0.
+- `-ExtraCapabilities privateNetworkClientServer` lets a debug server inside
+  the game accept connections from the LAN; without it UWP network isolation
+  blocks incoming connections. Leave it out of release builds.
 
 Dev Mode accepts unsigned or test-signed packages.
-
 ## Microsoft Store
 
 1. In [Partner Center](https://partner.microsoft.com/dashboard), reserve the
@@ -313,6 +342,7 @@ scripts/build.ps1          Build, bundle, sign, Store upload
 scripts/new-dev-cert.ps1   Self-signed test certificate
 scripts/build-deps.ps1     Build third_party/<arch> from source
 scripts/check-deps.ps1     Check prebuilt files against deps.json
+scripts/xbox.ps1           Xbox Device Portal: install, launch, screenshots, files, processes
 scripts/LoveUwp.psm1       Helpers shared by the scripts
 third_party/deps.json      Pinned sources and hashes of the prebuilt files
 third_party/<arch>/        Prebuilt LÖVE, LuaJIT, SDL2, ANGLE, runtime DLLs

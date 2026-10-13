@@ -141,34 +141,53 @@ Hand over the contents of `<out>\` (at least the `.msixbundle` or the
 
 A one-click install script for testers is a TODO item.
 
-## 5. Xbox in Dev Mode  *(not verified yet)*
+## 5. Xbox in Dev Mode  *(verified on Xbox One S, except gamepad mapping and app type effects)*
 
 1. **Activate Dev Mode** on the console: install *Xbox Dev Mode* from the
    Store on the console and register it with a Microsoft Partner Center
-   developer account. Restart into Dev Mode from Dev Home.
-2. In **Dev Home**, enable *Remote Access* (Xbox Device Portal) and set a
-   username and password. The console shows its address, e.g.
-   `https://192.168.1.50:11443`.
-3. Build x64 (Xbox One and Series are x64):
-   `scripts\build.ps1 -Game C:\games\mygame\uwp -Arch x64`. Signing is optional in Dev
-   Mode.
-4. In the browser open the Device Portal → **Home → My games & apps → Add**:
-   - upload `MyCompany.MyGame_1.0.0.0_x64.msix`;
-   - on the next page add the dependency
-     `Dependencies\x64\Microsoft.VCLibs.x64.14.00.appx`;
-   - start the installation.
-5. In Dev Home, select the app → **View details** → set **App type: Game**,
-   so it gets game resources (GPU and memory) rather than app limits.
-6. Run it from Dev Home. Saves and logs are reachable through Device Portal →
-   **File explorer** → `LocalAppData\<PackageFamilyName>\LocalState`.
+   developer account. Restart into Dev Mode from Dev Home. *(not verified here)*
+2. In **Dev Home**, enable *Remote Access* (Xbox Device Portal). The console
+   shows its address, e.g. `https://192.168.0.229:11443`. Without a portal
+   password the REST API works without authentication.
+3. Build x64 (Xbox One and Series are x64). For development builds use
+   `-Revision auto` (every build installs as an update) and, if the game has
+   a debug server, `-ExtraCapabilities privateNetworkClientServer`:
+   `scripts\build.ps1 -Game C:\games\mygame\uwp -Arch x64 -Sign -Revision auto -ExtraCapabilities privateNetworkClientServer`.
+   Signing is optional in Dev Mode.
+4. Install and start from the PC:
+
+   ```powershell
+   $env:LOVE_UWP_XBOX = '192.168.0.229'
+   scripts\xbox.ps1 install <out>\MyCompany.MyGame_1.0.0.1_x64.msix   # takes Dependencies\x64 next to it
+   scripts\xbox.ps1 launch MyCompany.MyGame
+   ```
+
+   By hand: Device Portal → **Home → My games & apps → Add**, upload the
+   `_x64.msix`, add `Dependencies\x64\Microsoft.VCLibs.x64.14.00.appx`.
+5. In Dev Home, select the game, press the View or Menu button →
+   **View details** → **App type: Game**. The default *App* gets about 1 GB
+   of memory and a share of the CPU and GPU (observed: the game process stops
+   just under 1 GB, 2160p crashes). The setting survives updates, not an
+   uninstall.
+6. Saves and logs: `scripts\xbox.ps1 files MyCompany.MyGame \LocalState` and
+   `scripts\xbox.ps1 pull ...`, or Device Portal → **File explorer** →
+   `LocalAppData\<PackageFamilyName>\LocalState`. `scripts\xbox.ps1 ps`,
+   `perf` and `screenshot` show the process memory, console load and screen.
 
 Notes:
 - On Xbox the window is always full screen; the game gets `love.resize` with
-  the TV resolution.
+  the TV resolution (1920×1080, or 3840×2160 with 4K output allowed).
+- The Xbox One S CPU is about 6–8× slower than a current desktop CPU on one
+  thread (measured with a large LÖVE game: loading 45 s vs 5.3 s, also for
+  pure C work such as OGG decoding); LuaJIT's JIT works there.
+- The on-screen keyboard no longer pops up when a game enables text input
+  (`screenKeyboard` in `player.json` turns it back on).
+- UWP network isolation: a server inside the game only accepts LAN
+  connections with `privateNetworkClientServer` (verified: port 5555
+  reachable from the PC with it).
 - The gamepad should arrive as an SDL game controller with the standard
-  layout (upstream SDL via Windows.Gaming.Input). Check the mapping on the
-  console. The B button is passed to the game.
-
+  layout (upstream SDL via Windows.Gaming.Input). *(Mapping not verified.)*
+  The B button is passed to the game.
 ## 6. Microsoft Store  *(not verified yet)*
 
 ### One-time setup
