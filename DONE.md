@@ -48,3 +48,6 @@ Finished work, grouped by topic (state as of 2026-10-13).
   PUBLISH-HOWTO (versions, certificates, packages, testers, Xbox, Store, checklist),
   DEVELOPMENT (internals, patches, rebuilding, testing, debugging, licensing history), REQUIREMENTS, LICENSE.
 - Game-specific notes live in the game's own `uwp` folder (example: `C:\projects\lua\schifahren\uwp`).
+
+- On-screen keyboard: host sets SDL_HINT_ENABLE_SCREEN_KEYBOARD=0 unless player.json has "screenKeyboard": true (games calling love.keyboard.setTextInput(true), e.g. PICO-8 poke(0x5f2d,1), popped up the Xbox keyboard).
+- games/hello shows a JIT measurement (trace compiled, compiled vs interpreted loop time) and gamepad state.

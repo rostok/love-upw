@@ -135,6 +135,7 @@ status and gamepads: `scripts\build.ps1 -Game hello -Sign`.
 | `source` | no | A folder with `main.lua` to zip into the `.love` at build time. Used instead of `game` |
 | `assets` | no | Folder with replacement images (see below) |
 | `capabilities` | no | Package capabilities. Default `["internetClient", "codeGeneration"]` |
+| `screenKeyboard` | no | `true` lets `love.keyboard.setTextInput(true)` open the on-screen keyboard (Xbox, touch devices). Default `false`: text input from real keyboards only, no keyboard popping up |
 | `minVersion` | no | Minimum Windows build, default `10.0.19041.0` |
 | `maxVersionTested` | no | Default `10.0.26100.0` |
 

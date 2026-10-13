@@ -35,5 +35,11 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 	// Deliver the Xbox B button / Windows "back" request to the game as input
 	// instead of letting the system navigate away from the app.
 	SDL_SetHint(SDL_HINT_WINRT_HANDLE_BACK_BUTTON, "1");
+	// love.keyboard.setTextInput(true) would pop up the on-screen keyboard on
+	// Xbox and touch devices. Text input from real keyboards works either way;
+	// games that want the on-screen keyboard set "screenKeyboard" in player.json.
+#if !LOVE_UWP_SCREEN_KEYBOARD
+	SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD, "0");
+#endif
 	return SDL_WinRTRunApp(startLove, nullptr);
 }

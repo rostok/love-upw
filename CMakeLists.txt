@@ -87,6 +87,7 @@ add_custom_target(check_deps
 add_executable(LovePlayer WIN32 host/main.cpp host/resources.rc "${STAGED_GAME}")
 add_dependencies(LovePlayer check_deps)
 target_include_directories(LovePlayer PRIVATE "${DEPS}/sdl2/include/SDL2")
+target_compile_definitions(LovePlayer PRIVATE LOVE_UWP_SCREEN_KEYBOARD=${GAME_SCREEN_KEYBOARD})
 target_link_libraries(LovePlayer PRIVATE ${LINK_LIBS} WindowsApp.lib)
 set_target_properties(LovePlayer PROPERTIES
     CXX_STANDARD 17

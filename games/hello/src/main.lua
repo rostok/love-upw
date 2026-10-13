@@ -30,10 +30,43 @@ local function fakeLoading(seconds)
     progress("Starting", 1)
 end
 
+-- Does LuaJIT really compile? jit.status() stays true even when the OS refuses
+-- executable memory and LuaJIT silently falls back to the interpreter, so:
+-- run the same hot loop compiled and interpreted, and check that a trace exists.
+local jitReport = "JIT: not measured"
+local function measureJit()
+    if not jit then
+        jitReport = "JIT: not LuaJIT (" .. _VERSION .. ")"
+        return
+    end
+    local function work(n)
+        local s = 0
+        for i = 1, n do s = s + (i % 7) * 0.5 end
+        return s
+    end
+    local n = 2e7
+    jit.flush()
+    local t0 = love.timer.getTime()
+    work(n)
+    local compiled = love.timer.getTime() - t0
+    local ok, util = pcall(require, "jit.util")
+    local traced = ok and util.traceinfo and util.traceinfo(1) ~= nil
+    jit.off(work, true)
+    t0 = love.timer.getTime()
+    work(n)
+    local interpreted = love.timer.getTime() - t0
+    jit.on(work, true)
+    jitReport = ("JIT %s, status %s, trace compiled: %s | loop %.0f ms vs interpreter %.0f ms (x%.1f)"):format(
+        jit.version, tostring(jit.status()), traced and "YES" or "NO",
+        compiled * 1000, interpreted * 1000, interpreted / math.max(compiled, 1e-6))
+end
+
 function love.load()
     love.graphics.setBackgroundColor(0.06, 0.09, 0.13)
     note("love.progress: %s", tostring(love.progress ~= nil))
-    fakeLoading(3)
+    fakeLoading(1.5)
+    measureJit()
+    note("%s", jitReport)
     note("LÖVE %d.%d.%d %s", love.getVersion())
     note("OS %s, save dir %s", love.system.getOS(), love.filesystem.getSaveDirectory())
     probe("renderer", love.graphics.getRendererInfo)
@@ -96,10 +129,32 @@ function love.draw()
     local lines = {
         ("Window %dx%d, pixels %dx%d, FPS %d"):format(w, h,
             love.graphics.getPixelWidth(), love.graphics.getPixelHeight(), love.timer.getFPS()),
+        ("OS %s, Lua memory %.0f MB"):format(love.system.getOS(), collectgarbage("count") / 1024),
+        "Renderer: " .. table.concat({love.graphics.getRendererInfo()}, " / "),
+        jitReport,
         "Joysticks: " .. #joysticks,
     }
+    -- Gamepad check: name, mapped buttons held, stick and trigger values.
+    local buttons = {"a", "b", "x", "y", "back", "guide", "start", "leftstick", "rightstick",
+        "leftshoulder", "rightshoulder", "dpup", "dpdown", "dpleft", "dpright"}
+    for i, js in ipairs(joysticks) do
+        local held = {}
+        if js:isGamepad() then
+            for _, b in ipairs(buttons) do
+                if js:isGamepadDown(b) then held[#held + 1] = b end
+            end
+            lines[#lines + 1] = ("%d: %s (gamepad) buttons [%s] L %.2f %.2f R %.2f %.2f LT %.2f RT %.2f"):format(
+                i, js:getName(), table.concat(held, " "),
+                js:getGamepadAxis("leftx"), js:getGamepadAxis("lefty"),
+                js:getGamepadAxis("rightx"), js:getGamepadAxis("righty"),
+                js:getGamepadAxis("triggerleft"), js:getGamepadAxis("triggerright"))
+        else
+            lines[#lines + 1] = ("%d: %s (not a gamepad, %d buttons, %d axes)"):format(
+                i, js:getName(), js:getButtonCount(), js:getAxisCount())
+        end
+    end
     if font then love.graphics.setFont(font) end
-    love.graphics.print(table.concat(lines, "\n"), 20, 20)
+    love.graphics.printf(table.concat(lines, "\n"), 20, 20, w - 40)
 end
 
 function love.keypressed(key)
